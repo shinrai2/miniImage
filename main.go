@@ -27,19 +27,25 @@ func main() {
 	option := flag.String("o", "n", "Wanted operation.")
 	srcPath := flag.String("src", "img/t.png", "The source file.")
 	tarPath := flag.String("tar", "output/t.png", "The target file.")
+	moreEx := flag.String("more", "", "More expansion plans.")
 	flag.Parse()
+	fmt.Println("-------------------------------")
+	fmt.Println("Option:\t\t", *option)
+	fmt.Println("SrcPath:\t", *srcPath)
+	fmt.Println("TarPath:\t", *tarPath)
+	fmt.Println("moreEx:\t\t", *moreEx)
+	fmt.Println("-------------------------------")
 	switch *option {
 	default:
 		check(errors.New("unexpected input"))
 	case dNOT:
 		fmt.Println("Do nothing. :)")
 	case dGRAY:
-		ToGray(*srcPath, *tarPath)
+		toGray(*srcPath, *tarPath)
 	}
 }
 
-// ToGray method converts a picture to a grayscale
-func ToGray(src string, tar string) {
+func toGray(src string, tar string) {
 	var (
 		err, err2, err3 error
 		fin, fout       *os.File
@@ -57,11 +63,13 @@ func ToGray(src string, tar string) {
 		im, err2 = jpeg.Decode(fin)
 	case hPNG:
 		im, err2 = png.Decode(fin)
+	default:
+		check(errors.New("unexpected input type"))
 	}
 	check(err2)
 	s2 := getImgTypeSuffix(tar)
 	fout, err = os.Create(tar) // Created after judgment to prevent invalid file generation
-	defer fin.Close()
+	defer fout.Close()
 	check(err)
 	switch s2 {
 	case hBMP:
@@ -72,6 +80,8 @@ func ToGray(src string, tar string) {
 		err3 = jpeg.Encode(fout, rgbaToGray(im), nil)
 	case hPNG:
 		err3 = png.Encode(fout, rgbaToGray(im))
+	default:
+		check(errors.New("unexpected output type"))
 	}
 	check(err3)
 }
@@ -95,7 +105,6 @@ func getImgTypeSuffix(filename string) byte {
 	case ".png":
 		return hPNG
 	default:
-		check(errors.New("unexpected output type"))
 		return 0x00
 	}
 }
