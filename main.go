@@ -23,7 +23,9 @@ const (
 	hPNG  byte   = 0x89
 	dNOT  string = "not"
 	dHELP string = "help"
+	dVERI string = "verify"
 	dGRAY string = "g"
+	dRGBA string = "r"
 )
 
 func main() {
@@ -46,8 +48,11 @@ func main() {
 		fmt.Println("All conversions were successful. :)")
 	case dNOT:
 		fmt.Println("Nothing to do. :)")
+		fmt.Println("For help, run % -o help")
 	case dHELP:
 		oHelp()
+	case dVERI:
+		fmt.Println("Is the picture grayscale?", verifyGray(file2Image(*srcPath)))
 	}
 
 }
@@ -60,6 +65,9 @@ func op(im image.Image, o []string, mex []string) image.Image {
 	case dGRAY:
 		fmt.Println("Successful conversion: rgbaToGray. :)")
 		return op(rgbaToGray(im), o[1:], mex[1:])
+	case dRGBA:
+		fmt.Println("Successful conversion: grayToRgba. :)")
+		return op(grayToRgba(im), o[1:], mex[1:])
 	default:
 		return im
 	}
@@ -70,7 +78,7 @@ func parseOaEx(o string, mex string) ([]string, []string) {
 	for i := 0; i < len(o); i++ {
 		ro[i] = o[i : i+1]
 	}
-	rmex := strings.Split(mex, "|")
+	rmex := strings.Split(mex, "*")
 	if len(ro) != len(rmex) {
 		panic(errors.New("The input parameters do not match"))
 	}
@@ -79,6 +87,10 @@ func parseOaEx(o string, mex string) ([]string, []string) {
 
 func oHelp() {
 	fmt.Println("Parameter format:")
+	fmt.Println("-o [g|r] -src [src_path] -tar [tar_path] -more [o1*o2*...]")
+	fmt.Println("Detail:")
+	fmt.Println("-o: g: rgbaToGray  r: grayToRgba  help: get help doc")
+	fmt.Println("    not: nothing?  verify: grayscale?")
 }
 
 func getImgType(f *os.File) byte {
@@ -122,6 +134,26 @@ func rgbaToGray(img image.Image) *image.Gray {
 		}
 	}
 	return gray
+}
+
+func grayToRgba(img image.Image) *image.RGBA {
+	var (
+		bounds = img.Bounds()
+		rgba   = image.NewRGBA(bounds)
+	)
+	for x := 0; x < bounds.Max.X; x++ {
+		for y := 0; y < bounds.Max.Y; y++ {
+			var gray = img.At(x, y)
+			rgba.Set(x, y, gray)
+		}
+	}
+	return rgba
+}
+
+func verifyGray(img image.Image) bool {
+	_, ok := img.(*image.Gray)
+	_, ok2 := img.(*image.Paletted)
+	return ok || ok2
 }
 
 func file2Image(src string) image.Image {
@@ -177,4 +209,9 @@ func image2File(tar string, im image.Image) {
 //export rgb2GrayC
 func rgb2GrayC(src *C.char, tar *C.char) {
 	image2File(C.GoString(tar), rgbaToGray(file2Image(C.GoString(src))))
+}
+
+//export verifyGrayC
+func verifyGrayC(src *C.char) bool {
+	return verifyGray(file2Image(C.GoString(src)))
 }
