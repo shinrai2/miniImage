@@ -1,3 +1,6 @@
 output/
 img/
 debug
+debug.test
+miniImage.h
+miniImage.so

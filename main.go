@@ -1,5 +1,7 @@
 package main
 
+import "C"
+
 import (
 	"errors"
 	"flag"
@@ -19,15 +21,16 @@ const (
 	hGIF  byte   = 0x47
 	hJPG  byte   = 0xff
 	hPNG  byte   = 0x89
-	dNOT  string = "n"
+	dNOT  string = "not"
+	dHELP string = "help"
 	dGRAY string = "g"
 )
 
 func main() {
-	option := flag.String("o", "n", "Wanted operation.")
+	option := flag.String("o", dNOT, "Wanted operation.")
 	srcPath := flag.String("src", "img/t.png", "The source file.")
 	tarPath := flag.String("tar", "output/t.png", "The target file.")
-	moreEx := flag.String("more", "", "More expansion plans.")
+	moreEx := flag.String("more", "", "More expansion operations.")
 	flag.Parse()
 	fmt.Println("-------------------------------")
 	fmt.Println("Option:\t\t", *option)
@@ -37,53 +40,45 @@ func main() {
 	fmt.Println("-------------------------------")
 	switch *option {
 	default:
-		check(errors.New("unexpected input"))
+		// check(errors.New("unexpected input"))
+		o, me := parseOaEx(*option, *moreEx)
+		image2File(*tarPath, op(file2Image(*srcPath), o, me))
+		fmt.Println("All conversions were successful. :)")
 	case dNOT:
-		fmt.Println("Do nothing. :)")
+		fmt.Println("Nothing to do. :)")
+	case dHELP:
+		oHelp()
+	}
+
+}
+
+func op(im image.Image, o []string, mex []string) image.Image {
+	if len(o) == 0 {
+		return im
+	}
+	switch o[0] {
 	case dGRAY:
-		toGray(*srcPath, *tarPath)
+		fmt.Println("Successful conversion: rgbaToGray. :)")
+		return op(rgbaToGray(im), o[1:], mex[1:])
+	default:
+		return im
 	}
 }
 
-func toGray(src string, tar string) {
-	var (
-		err, err2, err3 error
-		fin, fout       *os.File
-		im              image.Image
-	)
-	fin, err = os.Open(src)
-	defer fin.Close()
-	check(err)
-	switch getImgType(fin) {
-	case hBMP:
-		im, err2 = bmp.Decode(fin)
-	case hGIF:
-		im, err2 = gif.Decode(fin)
-	case hJPG:
-		im, err2 = jpeg.Decode(fin)
-	case hPNG:
-		im, err2 = png.Decode(fin)
-	default:
-		check(errors.New("unexpected input type"))
+func parseOaEx(o string, mex string) ([]string, []string) {
+	ro := make([]string, len(o))
+	for i := 0; i < len(o); i++ {
+		ro[i] = o[i : i+1]
 	}
-	check(err2)
-	s2 := getImgTypeSuffix(tar)
-	fout, err = os.Create(tar) // Created after judgment to prevent invalid file generation
-	defer fout.Close()
-	check(err)
-	switch s2 {
-	case hBMP:
-		err3 = bmp.Encode(fout, rgbaToGray(im))
-	case hGIF:
-		err3 = gif.Encode(fout, rgbaToGray(im), nil)
-	case hJPG:
-		err3 = jpeg.Encode(fout, rgbaToGray(im), nil)
-	case hPNG:
-		err3 = png.Encode(fout, rgbaToGray(im))
-	default:
-		check(errors.New("unexpected output type"))
+	rmex := strings.Split(mex, "|")
+	if len(ro) != len(rmex) {
+		panic(errors.New("The input parameters do not match"))
 	}
-	check(err3)
+	return ro, rmex
+}
+
+func oHelp() {
+	fmt.Println("Parameter format:")
 }
 
 func getImgType(f *os.File) byte {
@@ -91,7 +86,7 @@ func getImgType(f *os.File) byte {
 	_, err := f.Read(tmp)
 	check(err)
 	f.Seek(0, os.SEEK_SET) // Reset pointer
-	return tmp[0] ^ hBMP ^ hGIF ^ hJPG ^ hPNG ^ hBMP ^ hGIF ^ hJPG ^ hPNG
+	return tmp[0]
 }
 
 func getImgTypeSuffix(filename string) byte {
@@ -127,4 +122,59 @@ func rgbaToGray(img image.Image) *image.Gray {
 		}
 	}
 	return gray
+}
+
+func file2Image(src string) image.Image {
+	var (
+		err error
+		fin *os.File
+		im  image.Image
+	)
+	fin, err = os.Open(src)
+	check(err)
+	defer fin.Close()
+	switch getImgType(fin) {
+	case hBMP:
+		im, err = bmp.Decode(fin)
+	case hGIF:
+		im, err = gif.Decode(fin)
+	case hJPG:
+		im, err = jpeg.Decode(fin)
+	case hPNG:
+		im, err = png.Decode(fin)
+	default:
+		panic(errors.New("unexpected input type"))
+	}
+	check(err)
+	return im
+}
+
+func image2File(tar string, im image.Image) {
+	var (
+		err  error
+		fout *os.File
+	)
+	s2 := getImgTypeSuffix(tar)
+	if s2 == 0x00 {
+		panic(errors.New("unexpected output type"))
+	}
+	fout, err = os.Create(tar) // Created after judgment to prevent invalid file generation
+	check(err)
+	defer fout.Close()
+	switch s2 {
+	case hBMP:
+		err = bmp.Encode(fout, im)
+	case hGIF:
+		err = gif.Encode(fout, im, nil)
+	case hJPG:
+		err = jpeg.Encode(fout, im, nil)
+	case hPNG:
+		err = png.Encode(fout, im)
+	}
+	check(err)
+}
+
+//export rgb2GrayC
+func rgb2GrayC(src *C.char, tar *C.char) {
+	image2File(C.GoString(tar), rgbaToGray(file2Image(C.GoString(src))))
 }
