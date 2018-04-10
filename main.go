@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"image"
+	"image/color"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
@@ -26,6 +27,7 @@ const (
 	dVERI string = "verify"
 	dGRAY string = "g"
 	dRGBA string = "r"
+	dMOVE string = "m"
 )
 
 func main() {
@@ -68,6 +70,15 @@ func op(im image.Image, o []string, mex []string) image.Image {
 	case dRGBA:
 		fmt.Println("Successful conversion: grayToRgba. :)")
 		return op(grayToRgba(im), o[1:], mex[1:])
+	case dMOVE:
+		var (
+			left, top, right, bottom int
+			r, g, b, a               uint8
+		)
+		_, err := fmt.Sscanf(mex[0], "%d,%d,%d,%d,%d,%d,%d,%d", &left, &top, &right, &bottom, &r, &g, &b, &a)
+		check(err)
+		fmt.Println("Successful conversion: moveBounds. :)")
+		return op(moveBounds(im, left, top, right, bottom, r, g, b, a), o[1:], mex[1:])
 	default:
 		return im
 	}
@@ -91,6 +102,7 @@ func oHelp() {
 	fmt.Println("Detail:")
 	fmt.Println("-o: g: rgbaToGray  r: grayToRgba  help: get help doc")
 	fmt.Println("    not: nothing?  verify: grayscale?")
+	fmt.Println("    m: moveBounds")
 }
 
 func getImgType(f *os.File) byte {
@@ -148,6 +160,47 @@ func grayToRgba(img image.Image) *image.RGBA {
 		}
 	}
 	return rgba
+}
+
+func moveBounds(img image.Image, left, top, right, bottom int, r, g, b, a uint8) image.Image {
+	var (
+		bounds = image.Rectangle{
+			image.Point{0, 0},
+			image.Point{img.Bounds().Dx() + left + right, img.Bounds().Dy() + top + bottom},
+		}
+		fillColor = color.RGBA{r, g, b, a}
+	)
+	if verifyGray(img) {
+		// grayscale
+		img2 := image.NewGray(bounds)
+		for x := 0; x < bounds.Max.X; x++ {
+			for y := 0; y < bounds.Max.Y; y++ {
+				var ori color.Color
+				if xi, yi := func() (int, int) { return x - left, y - top }(); xi >= 0 && xi < img.Bounds().Dx() && yi >= 0 && yi < img.Bounds().Dy() {
+					ori = img.At(xi, yi)
+				} else {
+					ori = fillColor
+				}
+				img2.Set(x, y, ori)
+			}
+		}
+		return img2
+	} else {
+		// non-grayscale
+		img2 := image.NewRGBA(bounds)
+		for x := 0; x < bounds.Max.X; x++ {
+			for y := 0; y < bounds.Max.Y; y++ {
+				var ori color.Color
+				if xi, yi := func() (int, int) { return x - left, y - top }(); xi >= 0 && xi < img.Bounds().Dx() && yi >= 0 && yi < img.Bounds().Dy() {
+					ori = img.At(xi, yi)
+				} else {
+					ori = fillColor
+				}
+				img2.Set(x, y, ori)
+			}
+		}
+		return img2
+	}
 }
 
 func verifyGray(img image.Image) bool {
@@ -214,4 +267,9 @@ func rgb2GrayC(src *C.char, tar *C.char) {
 //export verifyGrayC
 func verifyGrayC(src *C.char) bool {
 	return verifyGray(file2Image(C.GoString(src)))
+}
+
+//export moveBoundsC
+func moveBoundsC(src *C.char, tar *C.char, left, top, right, bottom int, r, g, b, a uint8) {
+	image2File(C.GoString(tar), moveBounds(file2Image(C.GoString(src)), left, top, right, bottom, r, g, b, a))
 }
