@@ -91,7 +91,8 @@ func parseOaEx(o string, mex string) ([]string, []string) {
 	}
 	rmex := strings.Split(mex, "*")
 	if len(ro) != len(rmex) {
-		panic(errors.New("The input parameters do not match"))
+		fmt.Println("The input parameters do not match :(")
+		fmt.Println("For help, run % -o help")
 	}
 	return ro, rmex
 }
