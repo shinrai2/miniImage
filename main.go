@@ -11,8 +11,10 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 
 	"golang.org/x/image/bmp"
 )
@@ -106,6 +108,10 @@ func oHelp() {
 	fmt.Println("    m: moveBounds")
 }
 
+/**
+ * assist function
+ */
+
 func getImgType(f *os.File) byte {
 	tmp := make([]byte, 1)
 	_, err := f.Read(tmp)
@@ -134,6 +140,10 @@ func check(err error) {
 		panic(err)
 	}
 }
+
+/**
+ * core function
+ */
 
 func rgbaToGray(img image.Image) *image.Gray {
 	var (
@@ -210,6 +220,10 @@ func verifyGray(img image.Image) bool {
 	return ok || ok2
 }
 
+/**
+ * I/O function
+ */
+
 func file2Image(src string) image.Image {
 	var (
 		err error
@@ -260,9 +274,40 @@ func image2File(tar string, im image.Image) {
 	check(err)
 }
 
+/**
+ * c-shared function
+ */
+
 //export rgb2GrayC
 func rgb2GrayC(src *C.char, tar *C.char) {
 	image2File(C.GoString(tar), rgbaToGray(file2Image(C.GoString(src))))
+}
+
+//export rgb2GrayC2
+func rgb2GrayC2(src *C.char, tar *C.char) {
+	var wg sync.WaitGroup
+	srcG := C.GoString(src)
+	tarG := C.GoString(tar)
+	finfo, _ := ioutil.ReadDir(srcG)
+	for _, x := range finfo {
+		srcPath := srcG + "/" + x.Name()
+		tarPath := tarG + "/" + x.Name()
+		if x.IsDir() {
+			continue
+		} else {
+			wg.Add(1)
+			go func() {
+				image2File(tarPath, rgbaToGray(file2Image(srcPath)))
+				wg.Done()
+			}()
+		}
+	}
+	wg.Wait()
+}
+
+//export gray2RgbaC
+func gray2RgbaC(src *C.char, tar *C.char) {
+	image2File(C.GoString(tar), grayToRgba(file2Image(C.GoString(src))))
 }
 
 //export verifyGrayC
