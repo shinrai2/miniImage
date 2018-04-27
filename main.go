@@ -4,113 +4,62 @@ import "C"
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
-	"io/ioutil"
+	"math/rand"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/image/bmp"
 )
 
 const (
-	hBMP  byte   = 0x42
-	hGIF  byte   = 0x47
-	hJPG  byte   = 0xff
-	hPNG  byte   = 0x89
-	dNOT  string = "not"
-	dHELP string = "help"
-	dVERI string = "verify"
-	dGRAY string = "g"
-	dRGBA string = "r"
-	dMOVE string = "m"
+	hBMP byte = 0x42
+	hGIF byte = 0x47
+	hJPG byte = 0xff
+	hPNG byte = 0x89
 )
 
+var once sync.Once
+var imageMap = make(map[int]image.Image)
+
 func main() {
-	option := flag.String("o", dNOT, "Wanted operation.")
-	srcPath := flag.String("src", "img/t.png", "The source file.")
-	tarPath := flag.String("tar", "output/t.png", "The target file.")
-	moreEx := flag.String("more", "", "More expansion operations.")
-	flag.Parse()
-	fmt.Println("-------------------------------")
-	fmt.Println("Option:\t\t", *option)
-	fmt.Println("SrcPath:\t", *srcPath)
-	fmt.Println("TarPath:\t", *tarPath)
-	fmt.Println("moreEx:\t\t", *moreEx)
-	fmt.Println("-------------------------------")
-	switch *option {
-	default:
-		// check(errors.New("unexpected input"))
-		o, me := parseOaEx(*option, *moreEx)
-		image2File(*tarPath, op(file2Image(*srcPath), o, me))
-		fmt.Println("All conversions were successful. :)")
-	case dNOT:
-		fmt.Println("Nothing to do. :)")
-		fmt.Println("For help, run % -o help")
-	case dHELP:
-		oHelp()
-	case dVERI:
-		fmt.Println("Is the picture grayscale?", verifyGray(file2Image(*srcPath)))
+	var mor string
+	fmt.Println("Only supports calling as dynamic link library.")
+	fmt.Print("?> ")
+	fmt.Scanf("%s", &mor)
+	if mor == "debug" {
+		fmt.Println("DEBUG MODE::") // put some codes next here.
 	}
-
-}
-
-func op(im image.Image, o []string, mex []string) image.Image {
-	if len(o) == 0 {
-		return im
-	}
-	switch o[0] {
-	case dGRAY:
-		fmt.Println("Successful conversion: rgbaToGray. :)")
-		return op(rgbaToGray(im), o[1:], mex[1:])
-	case dRGBA:
-		fmt.Println("Successful conversion: grayToRgba. :)")
-		return op(grayToRgba(im), o[1:], mex[1:])
-	case dMOVE:
-		var (
-			left, top, right, bottom int
-			r, g, b, a               uint8
-		)
-		_, err := fmt.Sscanf(mex[0], "%d,%d,%d,%d,%d,%d,%d,%d", &left, &top, &right, &bottom, &r, &g, &b, &a)
-		check(err)
-		fmt.Println("Successful conversion: moveBounds. :)")
-		return op(moveBounds(im, left, top, right, bottom, r, g, b, a), o[1:], mex[1:])
-	default:
-		return im
-	}
-}
-
-func parseOaEx(o string, mex string) ([]string, []string) {
-	ro := make([]string, len(o))
-	for i := 0; i < len(o); i++ {
-		ro[i] = o[i : i+1]
-	}
-	rmex := strings.Split(mex, "*")
-	if len(ro) != len(rmex) {
-		fmt.Println("The input parameters do not match :(")
-		fmt.Println("For help, run % -o help")
-	}
-	return ro, rmex
-}
-
-func oHelp() {
-	fmt.Println("Parameter format:")
-	fmt.Println("-o [g|r] -src [src_path] -tar [tar_path] -more [o1*o2*...]")
-	fmt.Println("Detail:")
-	fmt.Println("-o: g: rgbaToGray  r: grayToRgba  help: get help doc")
-	fmt.Println("    not: nothing?  verify: grayscale?")
-	fmt.Println("    m: moveBounds")
 }
 
 /**
  * assist function
  */
+
+func getImageObject(key int) image.Image {
+	return imageMap[key]
+}
+
+func setImageObject(value image.Image) int {
+	once.Do(func() { rand.Seed(time.Now().UnixNano()) })
+	randi := rand.Int()
+	for imageMap[randi] != nil {
+		randi = rand.Int()
+	}
+	imageMap[randi] = value
+	return randi
+}
+
+func delImageObject(key int) {
+	delete(imageMap, key)
+}
 
 func getImgType(f *os.File) byte {
 	tmp := make([]byte, 1)
@@ -278,44 +227,54 @@ func image2File(tar string, im image.Image) {
  * c-shared function
  */
 
-//export rgb2GrayC
-func rgb2GrayC(src *C.char, tar *C.char) {
-	image2File(C.GoString(tar), rgbaToGray(file2Image(C.GoString(src))))
+// //export rgb2GrayC
+// func rgb2GrayC(src *C.char, tar *C.char) {
+// 	image2File(C.GoString(tar), rgbaToGray(file2Image(C.GoString(src))))
+// }
+
+// //export rgb2GrayC2
+// func rgb2GrayC2(src *C.char, tar *C.char) {
+// 	var wg sync.WaitGroup
+// 	srcG := C.GoString(src)
+// 	tarG := C.GoString(tar)
+// 	finfo, _ := ioutil.ReadDir(srcG)
+// 	for _, x := range finfo {
+// 		srcPath := srcG + "/" + x.Name()
+// 		tarPath := tarG + "/" + x.Name()
+// 		if x.IsDir() {
+// 			continue
+// 		} else {
+// 			wg.Add(1)
+// 			go func() {
+// 				image2File(tarPath, rgbaToGray(file2Image(srcPath)))
+// 				wg.Done()
+// 			}()
+// 		}
+// 	}
+// 	wg.Wait()
+// }
+
+// //export gray2RgbaC
+// func gray2RgbaC(src *C.char, tar *C.char) {
+// 	image2File(C.GoString(tar), grayToRgba(file2Image(C.GoString(src))))
+// }
+
+// //export verifyGrayC
+// func verifyGrayC(src *C.char) bool {
+// 	return verifyGray(file2Image(C.GoString(src)))
+// }
+
+// //export moveBoundsC
+// func moveBoundsC(src *C.char, tar *C.char, left, top, right, bottom int, r, g, b, a uint8) {
+// 	image2File(C.GoString(tar), moveBounds(file2Image(C.GoString(src)), left, top, right, bottom, r, g, b, a))
+// }
+
+//export exportInitialize
+func exportInitialize(path *C.char) int {
+	return setImageObject(file2Image(C.GoString(path)))
 }
 
-//export rgb2GrayC2
-func rgb2GrayC2(src *C.char, tar *C.char) {
-	var wg sync.WaitGroup
-	srcG := C.GoString(src)
-	tarG := C.GoString(tar)
-	finfo, _ := ioutil.ReadDir(srcG)
-	for _, x := range finfo {
-		srcPath := srcG + "/" + x.Name()
-		tarPath := tarG + "/" + x.Name()
-		if x.IsDir() {
-			continue
-		} else {
-			wg.Add(1)
-			go func() {
-				image2File(tarPath, rgbaToGray(file2Image(srcPath)))
-				wg.Done()
-			}()
-		}
-	}
-	wg.Wait()
-}
-
-//export gray2RgbaC
-func gray2RgbaC(src *C.char, tar *C.char) {
-	image2File(C.GoString(tar), grayToRgba(file2Image(C.GoString(src))))
-}
-
-//export verifyGrayC
-func verifyGrayC(src *C.char) bool {
-	return verifyGray(file2Image(C.GoString(src)))
-}
-
-//export moveBoundsC
-func moveBoundsC(src *C.char, tar *C.char, left, top, right, bottom int, r, g, b, a uint8) {
-	image2File(C.GoString(tar), moveBounds(file2Image(C.GoString(src)), left, top, right, bottom, r, g, b, a))
+//export exportSave
+func exportSave(key int, path *C.char) {
+	image2File(C.GoString(path), getImageObject(key))
 }
