@@ -36,6 +36,9 @@ func main() {
 	fmt.Scanf("%s", &mor)
 	if mor == "debug" {
 		fmt.Println("DEBUG MODE::") // put some codes next here.
+		fmt.Println("Nothing in debug mode. :(")
+	} else {
+		fmt.Println("Unknown command. :(")
 	}
 }
 
@@ -47,7 +50,7 @@ func getImageObject(key int) image.Image {
 	return imageMap[key]
 }
 
-func setImageObject(value image.Image) int {
+func newImageObject(value image.Image) int {
 	once.Do(func() { rand.Seed(time.Now().UnixNano()) })
 	randi := rand.Int()
 	for imageMap[randi] != nil {
@@ -55,6 +58,10 @@ func setImageObject(value image.Image) int {
 	}
 	imageMap[randi] = value
 	return randi
+}
+
+func setImageObject(key int, value image.Image) {
+	imageMap[key] = value
 }
 
 func delImageObject(key int) {
@@ -227,54 +234,37 @@ func image2File(tar string, im image.Image) {
  * c-shared function
  */
 
-// //export rgb2GrayC
-// func rgb2GrayC(src *C.char, tar *C.char) {
-// 	image2File(C.GoString(tar), rgbaToGray(file2Image(C.GoString(src))))
-// }
-
-// //export rgb2GrayC2
-// func rgb2GrayC2(src *C.char, tar *C.char) {
-// 	var wg sync.WaitGroup
-// 	srcG := C.GoString(src)
-// 	tarG := C.GoString(tar)
-// 	finfo, _ := ioutil.ReadDir(srcG)
-// 	for _, x := range finfo {
-// 		srcPath := srcG + "/" + x.Name()
-// 		tarPath := tarG + "/" + x.Name()
-// 		if x.IsDir() {
-// 			continue
-// 		} else {
-// 			wg.Add(1)
-// 			go func() {
-// 				image2File(tarPath, rgbaToGray(file2Image(srcPath)))
-// 				wg.Done()
-// 			}()
-// 		}
-// 	}
-// 	wg.Wait()
-// }
-
-// //export gray2RgbaC
-// func gray2RgbaC(src *C.char, tar *C.char) {
-// 	image2File(C.GoString(tar), grayToRgba(file2Image(C.GoString(src))))
-// }
-
-// //export verifyGrayC
-// func verifyGrayC(src *C.char) bool {
-// 	return verifyGray(file2Image(C.GoString(src)))
-// }
-
-// //export moveBoundsC
-// func moveBoundsC(src *C.char, tar *C.char, left, top, right, bottom int, r, g, b, a uint8) {
-// 	image2File(C.GoString(tar), moveBounds(file2Image(C.GoString(src)), left, top, right, bottom, r, g, b, a))
-// }
-
 //export exportInitialize
 func exportInitialize(path *C.char) int {
-	return setImageObject(file2Image(C.GoString(path)))
+	return newImageObject(file2Image(C.GoString(path)))
 }
 
 //export exportSave
 func exportSave(key int, path *C.char) {
 	image2File(C.GoString(path), getImageObject(key))
+}
+
+//export exportRelease
+func exportRelease(key int) {
+	delImageObject(key)
+}
+
+//export exportIsGray
+func exportIsGray(key int) bool {
+	return verifyGray(getImageObject(key))
+}
+
+//export exportToGray
+func exportToGray(key int) {
+	setImageObject(key, rgbaToGray(getImageObject(key)))
+}
+
+//export exportToRgba
+func exportToRgba(key int) {
+	setImageObject(key, grayToRgba(getImageObject(key)))
+}
+
+//export exportMoveBounds
+func exportMoveBounds(key, left, top, right, bottom int, r, g, b, a uint8) {
+	setImageObject(key, moveBounds(getImageObject(key), left, top, right, bottom, r, g, b, a))
 }
