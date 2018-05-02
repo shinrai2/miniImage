@@ -1,14 +1,25 @@
 require 'ffi'
+require 'os'
+
+if OS.windows? == false then
+    print "Don\'t support non Windows operating system."
+    exit 0
+elsif OS.bits == 64 then
+    $GOINT = :long_long
+else
+    $GOINT = :int
+end
+
 module CallLibrary
     extend FFI::Library
-    ffi_lib 'miniImage.so'
-    attach_function :exportInitialize, [:string], :long_long
-    attach_function :exportSave, [:long_long, :string], :void
-    attach_function :exportRelease, [:long_long], :void
-    attach_function :exportIsGray, [:long_long], :bool
-    attach_function :exportToGray, [:long_long], :void
-    attach_function :exportToRgba, [:long_long], :void
-    attach_function :exportMoveBounds, [:long_long, :long_long, :long_long, :long_long, :long_long, :uchar, :uchar, :uchar, :uchar], :void
+    ffi_lib "libs/#{ OS.bits }/miniImage.so"
+    attach_function :exportInitialize, [:string], $GOINT
+    attach_function :exportSave, [$GOINT, :string], :void
+    attach_function :exportRelease, [$GOINT], :void
+    attach_function :exportIsGray, [$GOINT], :bool
+    attach_function :exportToGray, [$GOINT], :void
+    attach_function :exportToRgba, [$GOINT], :void
+    attach_function :exportMoveBounds, [$GOINT, $GOINT, $GOINT, $GOINT, $GOINT, :uchar, :uchar, :uchar, :uchar], :void
 end
 
 module MiniImage
