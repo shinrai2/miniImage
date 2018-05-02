@@ -1,6 +1,8 @@
 require 'ffi'
 require 'os'
+require 'pathname'
 
+$DIR_PATH = Pathname.new(File.dirname(__FILE__)).realpath
 if OS.windows? == false then
     print "Don\'t support non Windows operating system."
     exit 0
@@ -12,7 +14,7 @@ end
 
 module CallLibrary
     extend FFI::Library
-    ffi_lib "libs/#{ OS.bits }/miniImage.so"
+    ffi_lib "#{ $DIR_PATH }/libs/#{ OS.bits }/miniImage.so" # 使用绝对路径，否则会报错
     attach_function :exportInitialize, [:string], $GOINT
     attach_function :exportSave, [$GOINT, :string], :void
     attach_function :exportRelease, [$GOINT], :void
