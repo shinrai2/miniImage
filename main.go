@@ -10,12 +10,15 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/golang/freetype"
+	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/bmp"
 )
 
@@ -24,10 +27,13 @@ const (
 	hGIF byte = 0x47
 	hJPG byte = 0xff
 	hPNG byte = 0x89
+	iMAG byte = 0x22
+	fONT byte = 0x33
 )
 
 var once sync.Once
 var imageMap = make(map[int]image.Image)
+var fontMap = make(map[int]*truetype.Font)
 
 func main() {
 	var mor string
@@ -66,6 +72,28 @@ func setImageObject(key int, value image.Image) {
 
 func delImageObject(key int) {
 	delete(imageMap, key)
+}
+
+func getFontObject(key int) *truetype.Font {
+	return fontMap[key]
+}
+
+func newFontObject(value *truetype.Font) int {
+	once.Do(func() { rand.Seed(time.Now().UnixNano()) })
+	randi := rand.Int()
+	for fontMap[randi] != nil {
+		randi = rand.Int()
+	}
+	fontMap[randi] = value
+	return randi
+}
+
+func setFontObject(key int, value *truetype.Font) {
+	fontMap[key] = value
+}
+
+func delFontObject(key int) {
+	delete(fontMap, key)
 }
 
 func getImgType(f *os.File) byte {
@@ -176,6 +204,25 @@ func verifyGray(img image.Image) bool {
 	return ok || ok2
 }
 
+func paintNew(width, height int, r, g, b, a uint8) image.Image {
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	backColor := color.RGBA{r, g, b, a}
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, backColor)
+		}
+	}
+	return img
+}
+
+func loadFont(path string) *truetype.Font {
+	fontBytes, err := ioutil.ReadFile(path)
+	check(err)
+	font, err := freetype.ParseFont(fontBytes)
+	check(err)
+	return font
+}
+
 /**
  * I/O function
  */
@@ -234,9 +281,17 @@ func image2File(tar string, im image.Image) {
  * c-shared function
  */
 
-//export exportInitialize
-func exportInitialize(path *C.char) int {
-	return newImageObject(file2Image(C.GoString(path)))
+//export exportFromFile
+func exportFromFile(symbol byte, path *C.char) int {
+	switch symbol {
+	case iMAG:
+		return newImageObject(file2Image(C.GoString(path)))
+	case fONT:
+		return newFontObject(loadFont(C.GoString(path)))
+	default:
+		fmt.Errorf("Unknown symbol: %x", symbol)
+	}
+	return -1
 }
 
 //export exportSave
@@ -245,8 +300,15 @@ func exportSave(key int, path *C.char) {
 }
 
 //export exportRelease
-func exportRelease(key int) {
-	delImageObject(key)
+func exportRelease(symbol byte, key int) {
+	switch symbol {
+	case iMAG:
+		delImageObject(key)
+	case fONT:
+		delFontObject(key)
+	default:
+		fmt.Errorf("Unknown symbol: %x", symbol)
+	}
 }
 
 //export exportIsGray
@@ -267,4 +329,9 @@ func exportToRgba(key int) {
 //export exportMoveBounds
 func exportMoveBounds(key, left, top, right, bottom int, r, g, b, a uint8) {
 	setImageObject(key, moveBounds(getImageObject(key), left, top, right, bottom, r, g, b, a))
+}
+
+//export exportNewBlank
+func exportNewBlank(width, height int, r, g, b, a uint8) int {
+	return newImageObject(paintNew(width, height, r, g, b, a))
 }
