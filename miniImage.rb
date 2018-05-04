@@ -3,6 +3,8 @@ require 'os'
 require 'pathname'
 
 $DIR_PATH = Pathname.new(File.dirname(__FILE__)).realpath
+$SYM_IMAGE = 0x22
+$SYM_FONT = 0x33
 if OS.windows? == false then
     print "Don\'t support non Windows operating system."
     exit 0
@@ -23,20 +25,21 @@ module CallLibrary
     attach_function :exportToRgba, [$GOINT], :void
     attach_function :exportMoveBounds, [$GOINT, $GOINT, $GOINT, $GOINT, $GOINT, :uchar, :uchar, :uchar, :uchar], :void
     attach_function :exportNewBlank, [$GOINT, $GOINT, :uchar, :uchar, :uchar, :uchar], $GOINT
+    attach_function :exportDrawString, [$GOINT, $GOINT, :double, $GOINT, $GOINT, :string, :uchar, :uchar, :uchar, :uchar], :void
 end
 
 module BlankConstuctor
-    def newBlank(width, height, r=255, g=255, b=255, a=255)
-        return self.new(CallLibrary.exportNewBlank(width, height, r, g, b, a))
+    def newBlank(width, height, color)
+        return self.new(CallLibrary.exportNewBlank(width, height, *color.args))
     end
 end
 
 module BasicConstuctor
     def loadFrom(path)
         if self == MiniImage::Image then
-            symbl = 0x22
+            symbl = $SYM_IMAGE
         elsif self == MiniImage::Font then
-            symbl = 0x33
+            symbl = $SYM_FONT
         end
         return self.new(CallLibrary.exportFromFile(symbl, path))
     end
@@ -55,7 +58,7 @@ module MiniImage
         def initialize(key)
             @keyOfMap = key
 
-            ObjectSpace.define_finalizer(self, Finalizer.finalize(0x22, key)) # avoid mem leak
+            ObjectSpace.define_finalizer(self, Finalizer.finalize($SYM_IMAGE, key)) # avoid mem leak
         end
 
         def save(path)
@@ -74,9 +77,11 @@ module MiniImage
             CallLibrary.exportToRgba(@keyOfMap)
         end
 
-        def moveBounds(left, top, right, bottom, r, g, b, a)
-            CallLibrary.exportMoveBounds(@keyOfMap, left, top, right, bottom, r, g, b, a)
+        def moveBounds(left, top, right, bottom, color)
+            CallLibrary.exportMoveBounds(@keyOfMap, left, top, right, bottom, *color.args)
         end
+
+        attr_reader :keyOfMap
     end
 
     class Font
@@ -85,9 +90,26 @@ module MiniImage
         def initialize(key)
             @keyOfMap = key
 
-            ObjectSpace.define_finalizer(self, Finalizer.finalize(0x33, key)) # avoid mem leak
+            ObjectSpace.define_finalizer(self, Finalizer.finalize($SYM_FONT, key)) # avoid mem leak
+        end
+
+        def drawString(img, fontSize, x, y, content, color)
+            CallLibrary.exportDrawString(@keyOfMap, img.keyOfMap, fontSize, x, y, content, *color.args)
+        end
+
+        attr_reader :keyOfMap
+    end
+
+    class Color
+        def initialize(r, g, b, a)
+            @r, @g, @b, @a = r, g, b, a
+        end
+
+        def args()
+            return [@r, @g, @b, @a]
         end
     end
+
     private
     class Finalizer
         def self.finalize(sym, key)

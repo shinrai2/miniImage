@@ -23,12 +23,13 @@ import (
 )
 
 const (
-	hBMP byte = 0x42
-	hGIF byte = 0x47
-	hJPG byte = 0xff
-	hPNG byte = 0x89
-	iMAG byte = 0x22
-	fONT byte = 0x33
+	hBMP byte    = 0x42
+	hGIF byte    = 0x47
+	hJPG byte    = 0xff
+	hPNG byte    = 0x89
+	iMAG byte    = 0x22
+	fONT byte    = 0x33
+	sDPI float64 = 72
 )
 
 var once sync.Once
@@ -42,7 +43,11 @@ func main() {
 	fmt.Scanf("%s", &mor)
 	if mor == "debug" {
 		fmt.Println("DEBUG MODE::") // put some codes next here.
-		fmt.Println("Nothing in debug mode. :(")
+		img := paintNew(200, 200, 128, 128, 128, 255)
+		font := loadFont("fonts/times.ttf")
+		drawFont(img, font, 20, 255, 255, 255, 255, 100, 100, "123")
+		image2File("output/debug.bmp", img)
+		fmt.Println("Finished. :)")
 	} else {
 		fmt.Println("Unknown command. :(")
 	}
@@ -223,6 +228,30 @@ func loadFont(path string) *truetype.Font {
 	return font
 }
 
+func drawFont(img image.Image, font *truetype.Font,
+	fontSize float64, r, g, b, a uint8, x, y int, content string) {
+	c := freetype.NewContext()
+	c.SetDPI(sDPI)
+	c.SetFont(font)
+	c.SetFontSize(fontSize)
+	c.SetClip(img.Bounds())
+	switch value := img.(type) {
+	case *image.RGBA:
+		c.SetDst(value)
+	case *image.Gray:
+		c.SetDst(value)
+	case *image.Paletted:
+		c.SetDst(value)
+	default:
+		fmt.Errorf("Unsupport format")
+	}
+	c.SetSrc(image.NewUniform(color.RGBA{r, g, b, a}))
+	pt := freetype.Pt(x, y+int(c.PointToFixed(fontSize*1.5)>>8)) // move the y dim to line center
+
+	_, err := c.DrawString(content, pt)
+	check(err)
+}
+
 /**
  * I/O function
  */
@@ -334,4 +363,10 @@ func exportMoveBounds(key, left, top, right, bottom int, r, g, b, a uint8) {
 //export exportNewBlank
 func exportNewBlank(width, height int, r, g, b, a uint8) int {
 	return newImageObject(paintNew(width, height, r, g, b, a))
+}
+
+//export exportDrawString
+func exportDrawString(keyOfFont, keyOfImg int, fontSize float64,
+	x, y int, content *C.char, r, g, b, a uint8) {
+	drawFont(getImageObject(keyOfImg), getFontObject(keyOfFont), fontSize, r, g, b, a, x, y, C.GoString(content))
 }
