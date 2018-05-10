@@ -21,9 +21,9 @@ module CallLibrary
     attach_function :exportSave, [$GOINT, :string], :void
     attach_function :exportRelease, [:uchar, $GOINT], :void
     attach_function :exportIsGray, [$GOINT], :bool
-    attach_function :exportToGray, [$GOINT], :void
-    attach_function :exportToRgba, [$GOINT], :void
-    attach_function :exportMoveBounds, [$GOINT, $GOINT, $GOINT, $GOINT, $GOINT, :uchar, :uchar, :uchar, :uchar], :void
+    attach_function :exportToGray, [$GOINT, :bool], $GOINT
+    attach_function :exportToRgba, [$GOINT, :bool], $GOINT
+    attach_function :exportMoveBounds, [$GOINT, $GOINT, $GOINT, $GOINT, $GOINT, :uchar, :uchar, :uchar, :uchar, :bool], $GOINT
     attach_function :exportNewBlank, [$GOINT, $GOINT, :uchar, :uchar, :uchar, :uchar], $GOINT
     attach_function :exportDrawString, [$GOINT, $GOINT, :double, $GOINT, $GOINT, :string, :uchar, :uchar, :uchar, :uchar], :void
 end
@@ -69,16 +69,31 @@ module MiniImage
             return CallLibrary.exportIsGray(@keyOfMap)
         end
 
+        def toGray!()
+            CallLibrary.exportToGray(@keyOfMap, true)
+        end
+
+        def toRgba!()
+            CallLibrary.exportToRgba(@keyOfMap, true)
+        end
+
+        def moveBounds!(left, top, right, bottom, color)
+            CallLibrary.exportMoveBounds(@keyOfMap, left, top, right, bottom, *color.args, true)
+        end
+
         def toGray()
-            CallLibrary.exportToGray(@keyOfMap)
+            n = CallLibrary.exportToGray(@keyOfMap, false)
+            return MiniImage::Image.send(:new, n)
         end
 
         def toRgba()
-            CallLibrary.exportToRgba(@keyOfMap)
+            n = CallLibrary.exportToRgba(@keyOfMap, false)
+            return MiniImage::Image.send(:new, n)
         end
 
         def moveBounds(left, top, right, bottom, color)
-            CallLibrary.exportMoveBounds(@keyOfMap, left, top, right, bottom, *color.args)
+            n = CallLibrary.exportMoveBounds(@keyOfMap, left, top, right, bottom, *color.args, false)
+            return MiniImage::Image.send(:new, n)
         end
 
         attr_reader :keyOfMap

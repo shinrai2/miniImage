@@ -346,18 +346,36 @@ func exportIsGray(key int) bool {
 }
 
 //export exportToGray
-func exportToGray(key int) {
-	setImageObject(key, rgbaToGray(getImageObject(key)))
+func exportToGray(key int, self bool) int {
+	tmp := rgbaToGray(getImageObject(key))
+	if self == true {
+		setImageObject(key, tmp)
+		return key
+	} else {
+		return newImageObject(tmp)
+	}
 }
 
 //export exportToRgba
-func exportToRgba(key int) {
-	setImageObject(key, grayToRgba(getImageObject(key)))
+func exportToRgba(key int, self bool) int {
+	tmp := grayToRgba(getImageObject(key))
+	if self == true {
+		setImageObject(key, tmp)
+		return key
+	} else {
+		return newImageObject(tmp)
+	}
 }
 
 //export exportMoveBounds
-func exportMoveBounds(key, left, top, right, bottom int, r, g, b, a uint8) {
-	setImageObject(key, moveBounds(getImageObject(key), left, top, right, bottom, r, g, b, a))
+func exportMoveBounds(key, left, top, right, bottom int, r, g, b, a uint8, self bool) int {
+	tmp := moveBounds(getImageObject(key), left, top, right, bottom, r, g, b, a)
+	if self == true {
+		setImageObject(key, tmp)
+		return key
+	} else {
+		return newImageObject(tmp)
+	}
 }
 
 //export exportNewBlank
@@ -370,3 +388,13 @@ func exportDrawString(keyOfFont, keyOfImg int, fontSize float64,
 	x, y int, content *C.char, r, g, b, a uint8) {
 	drawFont(getImageObject(keyOfImg), getFontObject(keyOfFont), fontSize, r, g, b, a, x, y, C.GoString(content))
 }
+
+// //export exportSplice
+// func exportSplice(keyOfSplice, keyOfImg int) {
+
+// }
+
+// //export exportSpliced
+// func exportSpliced(keyOfSplice int) {
+
+// }
