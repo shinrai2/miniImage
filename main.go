@@ -130,6 +130,13 @@ func check(err error) {
 	}
 }
 
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+
 /**
  * core function
  */
@@ -250,6 +257,42 @@ func drawFont(img image.Image, font *truetype.Font,
 
 	_, err := c.DrawString(content, pt)
 	check(err)
+}
+
+func concatImage(img1, img2 image.Image, direct bool) image.Image {
+	x1 := img1.Bounds().Dx()
+	x2 := img2.Bounds().Dx()
+	y1 := img1.Bounds().Dy()
+	y2 := img2.Bounds().Dy()
+	if direct == true { // Landscape
+		c := image.NewRGBA(image.Rect(0, 0, x1+x2, max(y1, y2)))
+		for x := 0; x < c.Bounds().Dx(); x++ {
+			for y := 0; y < c.Bounds().Dy(); y++ {
+				if x < x1 && y < y1 {
+					c.Set(x, y, img1.At(x, y))
+				} else if x >= x1 && y < y2 {
+					c.Set(x, y, img2.At(x-x1, y))
+				} else {
+					c.Set(x, y, color.White) // default color
+				}
+			}
+		}
+		return c
+	} else { // Vertical
+		c := image.NewRGBA(image.Rect(0, 0, max(x1, x2), y1+y2))
+		for x := 0; x < c.Bounds().Dx(); x++ {
+			for y := 0; y < c.Bounds().Dy(); y++ {
+				if x < x1 && y < y1 {
+					c.Set(x, y, img1.At(x, y))
+				} else if x < x2 && y >= y1 {
+					c.Set(x, y, img2.At(x, y-y1))
+				} else {
+					c.Set(x, y, color.White) // default color
+				}
+			}
+		}
+		return c
+	}
 }
 
 /**
@@ -387,6 +430,11 @@ func exportNewBlank(width, height int, r, g, b, a uint8) int {
 func exportDrawString(keyOfFont, keyOfImg int, fontSize float64,
 	x, y int, content *C.char, r, g, b, a uint8) {
 	drawFont(getImageObject(keyOfImg), getFontObject(keyOfFont), fontSize, r, g, b, a, x, y, C.GoString(content))
+}
+
+//export exportConcat
+func exportConcat(keyOfImgA, keyOfImgB int, direct bool) int {
+	return newImageObject(concatImage(getImageObject(keyOfImgA), getImageObject(keyOfImgB), direct))
 }
 
 // //export exportSplice

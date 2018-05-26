@@ -26,6 +26,7 @@ module CallLibrary
     attach_function :exportMoveBounds, [$GOINT, $GOINT, $GOINT, $GOINT, $GOINT, :uchar, :uchar, :uchar, :uchar, :bool], $GOINT
     attach_function :exportNewBlank, [$GOINT, $GOINT, :uchar, :uchar, :uchar, :uchar], $GOINT
     attach_function :exportDrawString, [$GOINT, $GOINT, :double, $GOINT, $GOINT, :string, :uchar, :uchar, :uchar, :uchar], :void
+    attach_function :exportConcat, [$GOINT, $GOINT, :bool], $GOINT
 end
 
 module BlankConstuctor
@@ -93,6 +94,11 @@ module MiniImage
 
         def moveBounds(left, top, right, bottom, color)
             n = CallLibrary.exportMoveBounds(@keyOfMap, left, top, right, bottom, *color.args, false)
+            return MiniImage::Image.send(:new, n)
+        end
+
+        def self.concat(img1, img2, direct)
+            n = CallLibrary.exportConcat(img1.keyOfMap, img2.keyOfMap, direct)
             return MiniImage::Image.send(:new, n)
         end
 
